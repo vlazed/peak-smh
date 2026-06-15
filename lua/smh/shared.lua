@@ -1,0 +1,115 @@
+if not SMH then
+    SMH = {}
+end
+
+SMH.MessageTypes = {
+    "SetFrame",
+    "SetFrameResponse",
+
+    "SelectEntity",
+    "SelectEntityResponse",
+	
+	-- AUDIO ==============
+	"UpdateServerAudio",
+	"PlayAudio",
+	"StopAudio",
+	"StopAllAudio",
+	-- ====================
+
+    "CreateKeyframe",
+    "UpdateKeyframe",
+    "UpdateKeyframeExecute",
+    "CopyKeyframe",
+    "CopyKeyframeExecute",
+    "UpdateKeyframeResponse",
+    "DeleteKeyframe",
+    "DeleteKeyframeResponse",
+    "GetAllKeyframes",
+
+    "StartPlayback",
+    "StopPlayback",
+    "PlaybackResponse",
+
+    "SetRendering",
+    "UpdateGhostState",
+    "UpdateGhostStateResponse",
+
+    "GetServerSaves",
+    "GetServerSavesResponse",
+    "GetModelList",
+    "GetModelListResponse",
+    "GetModelInfo",
+    "GetModelInfoResponse",
+    "GetServerEntities",
+    "GetServerEntitiesResponse",
+    "Load",
+    "LoadResponse",
+    "LoadResponseSettings",
+    "RequestSave",
+    "SaveExists",
+    "Save",
+    "SaveResponse",
+    "AddFolderResponse",
+    "RequestGoToFolder",
+    "RequestAppend",
+    "RequestAppendResponse",
+    "Append",
+    "RequestPack",
+    "RequestUnpack",
+    "DeleteSave",
+    "DeleteSaveResponse",
+
+    "ApplyEntityName",
+    "ApplyEntityNameResponse",
+    "UpdateTimeline",
+    "UpdateTimelineResponse",
+    "RequestModifiers",
+    "RequestModifiersResponse",
+    "AddTimeline",
+    "RemoveTimeline",
+    "UpdateTimelineInfoResponse",
+    "UpdateModifier",
+    "UpdateModifierResponse",
+    "UpdateKeyframeColor",
+    "UpdateKeyframeColorResponse",
+
+    "SetPreviewEntity",
+    "SetSpawnGhost",
+    "SpawnEntity",
+    "SpawnReset",
+    "SetSpawnOffsetMode",
+    "SetSpawnOrigin",
+    "OffsetPos",
+    "OffsetAng",
+
+    "SetTimeline",
+    "RequestTimelineInfo",
+    "RequestTimelineInfoResponse",
+
+    "RequestWorldData",
+    "RequestWorldDataResponse",
+    "UpdateWorld",
+
+    "StartPhysicsRecord",
+    "StopPhysicsRecord",
+    "StopPhysicsRecordResponse",
+
+    "RequestNodes",
+    "RequestNodesResponse",
+    "RequestDefaultPose",
+    "RequestDefaultPoseResponse",
+    "UpdateNode",
+
+    "RequestNewSession"
+}
+for key, val in pairs(SMH.MessageTypes) do
+    local prefixVal = "SMH" .. val
+    SMH.MessageTypes[val] = prefixVal
+end
+
+cleanup.Register("smhentity")
+CreateConVar("sbox_maxsmhentity", 20, FCVAR_NOTIFY)
+
+include("shared/saves.lua")
+include("shared/tablesplit.lua")
+include("shared/audioseq_saves.lua")
