@@ -53,4 +53,4 @@ jobs:
           vdf: ${{ secrets.PEAKBOT_STEAM_VDF }}
           id: ${{ secrets.ADDON_ID }}
           changelog: ${{ steps.changelog_final.outputs.CHANGELOG }}
-          folder: ./
+          folder: .
