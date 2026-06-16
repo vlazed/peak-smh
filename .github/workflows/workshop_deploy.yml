@@ -10,10 +10,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ref: "main"
-
+          node-version: '20'
+          
+      - name: Install Converter
+        run: npm install -g md2bb
+        
       - name: Resolve Changelog Message
         id: changelog
         env:
@@ -27,11 +31,21 @@ jobs:
             PR_MSG=$(git log -1 --pretty=%B FETCH_HEAD)
             echo "MSG=$PR_MSG" >> "$GITHUB_OUTPUT"
           fi
-          
-      - uses: gmod-workshop/workshop-upload@v1
+
+      - name: Convert Markdown to BBCode
+        id: changelog_final
+        env:
+          OLD_CHANGELOG: ${{ steps.changelog.outputs.MSG }}
+        run: |
+          echo "CHANGELOG<<EOF" >> "$GITHUB_OUTPUT"
+          md2bb "$OLD_CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Steam Workshop
+        uses: gmod-workshop/workshop-upload@v1
         with:
           username: ${{ secrets.PEAKBOT_STEAM_USERNAME }}
           vdf: ${{ secrets.PEAKBOT_STEAM_VDF }}
           id: ${{ secrets.ADDON_ID }}
-          changelog: ${{ steps.changelog.outputs.MSG }}
+          changelog: ${{ steps.changelog_final.outputs.CHANGELOG }}
           folder: ./
