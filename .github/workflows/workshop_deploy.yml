@@ -16,7 +16,7 @@ jobs:
           node-version: '20'
           
       - name: Install Converter
-        run: npm install -g md2bb
+        run: npm install -g @steamdown/cli
         
       - name: Resolve Changelog Message
         id: changelog
@@ -37,8 +37,9 @@ jobs:
         env:
           OLD_CHANGELOG: ${{ steps.changelog.outputs.MSG }}
         run: |
-          echo "CHANGELOG<<EOF" >> "$GITHUB_OUTPUT"
-          md2bb "$OLD_CHANGELOG" >> "$GITHUB_OUTPUT"
+          # https://github.com/orgs/community/discussions/116619#discussioncomment-8994849
+          echo "CHANGELOG<<EOF" >> "$GITHUB_OUTPUT"          
+          echo "$OLD_CHANGELOG" | steamdown >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Upload to Steam Workshop
