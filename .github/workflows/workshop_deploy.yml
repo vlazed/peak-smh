@@ -25,11 +25,15 @@ jobs:
           PUSH_MSG: ${{ github.event.head_commit.message }}
         run: |
           if [ -n "$PUSH_MSG" ]; then
-            echo "MSG=$PUSH_MSG" >> "$GITHUB_OUTPUT"
+            echo "MSG<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$PUSH_MSG" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           else
-            # Extracts the exact commit message of the PR head commit
             PR_MSG=$(git log -1 --pretty=%B FETCH_HEAD)
-            echo "MSG=$PR_MSG" >> "$GITHUB_OUTPUT"
+            
+            echo "MSG<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$PR_MSG" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Convert Markdown to BBCode
