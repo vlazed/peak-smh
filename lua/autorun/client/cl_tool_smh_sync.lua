@@ -14,7 +14,9 @@ function SMHEntitySyncFactory(convar, hookName, callback)
 	hook.Add("SMH_PostSetFrame", hookName, function(frame)
 		if enabled then
 			local ents = SMH.State.Entity
-			callback(next(ents))
+			local entity = next(ents)
+			if not IsValid(entity) then return end
+			callback(entity)
 		end
 	end)
 end
