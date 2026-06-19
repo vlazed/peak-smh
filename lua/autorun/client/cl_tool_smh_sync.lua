@@ -1,18 +1,10 @@
----@class vlazed_SMHState
----@field Entity {[Entity]: boolean}
----@field Frame integer
-
----@class vlazed_SMH
----@field State vlazed_SMHState
-
----@class vlazed_SMHEntity: Entity
----@field FingerIndex integer[]
+local shouldRemap = CreateClientConVar("sync_smh_to_facepose_remap", "0", true, false, "If set to 1, this applies a remapping correction for the default faceposer, or for any faceposer tool that remaps its flexes. Set this to 0 for the Improved Faceposer or Enhanced Faceposer", 0, 1)
 
 ---Generate a think hook that updates an entity when the SMH state changes
 ---@param convar string
 ---@param hookName string
----@param callback fun(ent: vlazed_SMHEntity)
-function EntitySyncFactory(convar, hookName, callback)
+---@param callback fun(ent: SMHEntity)
+function SMHEntitySyncFactory(convar, hookName, callback)
 	local enableSync = CreateClientConVar(convar, "1", true, false, nil, 0, 1)
 	local enabled = enableSync:GetBool()
 	cvars.RemoveChangeCallback(convar, "updateBoolean")
@@ -20,33 +12,18 @@ function EntitySyncFactory(convar, hookName, callback)
 		enabled = tobool(Either(tonumber(newValue) ~= nil, tonumber(newValue) > 0, false))
 	end, "updateBoolean")
 
-	local lastFrame = 0
-	hook.Remove("Think", hookName)
-	hook.Add("Think", hookName, function()
-		if not enabled then
-			return
+	hook.Remove("SMH_PostSetFrame", hookName)
+	hook.Add("SMH_PostSetFrame", hookName, function(frame)
+		if enabled then
+			local ents = SMH.State.Entity
+			local entity = next(ents)
+			if not IsValid(entity) then return end
+			callback(entity)
 		end
-
-		---@type vlazed_SMH
-		local SMH = SMH ---@diagnostic disable-line
-		if not SMH or not SMH.State then
-			return
-		end
-		if not next(SMH.State.Entity) then
-			return
-		end
-		if lastFrame == SMH.State.Frame then
-			return
-		end
-
-		local entity = next(SMH.State.Entity)
-		callback(entity)
-
-		lastFrame = SMH.State.Frame
 	end)
 end
 
-local entitySyncFactory = EntitySyncFactory
+local entitySyncFactory = SMHEntitySyncFactory
 
 -- On frame change, set each slider on the faceposer to correspond to a flex
 entitySyncFactory("sync_smh_to_facepose", "syncFacePoseSMH", function(ent)
@@ -58,7 +35,12 @@ entitySyncFactory("sync_smh_to_facepose", "syncFacePoseSMH", function(ent)
 		return
 	end
 	for i = 0, n - 1 do
-		RunConsoleCommand("faceposer_flex" .. i, ent:GetNW2Float("faceposer_flex" .. i))
+		local weight = ent:GetNW2Float("faceposer_flex" .. i)
+		local min, max = ent:GetFlexBounds(i)
+		if shouldRemap:GetBool() then
+			weight = math.Remap(weight, 0, 1, min, max)
+		end
+		RunConsoleCommand("faceposer_flex" .. i, weight)
 	end
 end)
 
@@ -107,10 +89,15 @@ entitySyncFactory("sync_smh_to_fingerpose", "syncFingerPoseSMH", function(ent)
 	if tool:GetClass() ~= "gmod_tool" then
 		return
 	end
+	if tool:GetMode() ~= "finger" then 
+		return
+	end
+	local hand = tool:GetNWInt( "HandNum" )
 
+	-- FIXME: This isn't consistent for most ragdolls
 	local bTF2 = HasTF2Hands(ent)
 	for i = 0, VarsOnHand - 1 do
-		local Ang = ent:GetNW2Angle(Format("finger_%s", i))
+		local Ang = ent:GetNW2Angle(Format("finger_%s", i + VarsOnHand * hand))
 
 		if bTF2 then
 			if i < 3 then
