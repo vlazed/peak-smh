@@ -477,7 +477,7 @@ end
 function PANEL:InitModifiers(list, ids)
     ModifierList = table.Copy(list)
     ModifierNames = table.Copy(ids)
-    ModifierIds = table.Flip(names)
+    ModifierIds = table.Flip(ids)
 end
 
 function PANEL:GetModifiers()
