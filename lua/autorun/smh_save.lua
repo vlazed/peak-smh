@@ -1,4 +1,4 @@
-local newDupeSave = CreateConVar("smh_streamsave", "0", { FCVAR_ARCHIVE, FCVAR_CHEAT, FCVAR_REPLICATED }, "If set to 1, this allows one to make GMod saves with a bigger file sizes (greater than 256KB).", 0, 1)
+local newDupeSave = CreateConVar("smh_streamsave", "1", { FCVAR_ARCHIVE, FCVAR_CHEAT, FCVAR_REPLICATED }, "If set to 1, this allows one to make GMod saves with a bigger file sizes (greater than 256KB).", 0, 1)
 
 local isSavingMap
 local isLoadingMap
