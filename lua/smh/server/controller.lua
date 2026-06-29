@@ -197,7 +197,9 @@ end
 local function CreateKeyframe(msgLength, player)
     local entities = {}
     for i = 1, net.ReadUInt(INT_BITCOUNT) do
-        entities[i] = net.ReadEntity()
+        local entity = net.ReadEntity()
+        entities[i] = entity
+        SMH.PlaybackManager.UpdateCacheFor(entity)
     end
 
     local frame = net.ReadUInt(INT_BITCOUNT)
@@ -224,6 +226,17 @@ local function CreateKeyframe(msgLength, player)
     end
 
     SMH.GhostsManager.UpdateKeyframe(player)
+end
+
+---@param keyframes FrameData[]
+local function flushPlaybackCacheFromKeyframes(keyframes)
+    local flushedEnts = {}
+    for _, keyframe in ipairs(keyframes) do
+        if not flushedEnts[keyframe.Entity] then
+            SMH.PlaybackManager.UpdateCacheFor(keyframe.Entity)
+            flushedEnts[keyframe.Entity] = true
+        end
+    end
 end
 
 ---@type {[Player]: BufferDatum}
@@ -259,16 +272,17 @@ end
 local function UpdateKeyframeExecute(msgLength, player)
     local keyframes = SMH.KeyframeManager.Update(player, bufferData[player].Ids, bufferData[player].UpdateData, bufferData[player].Timeline)
 
-    -- for key, keyframe in ipairs(keyframes) do
     local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes(keyframes)
-
+    
     net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
     framecount = SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
     net.Send(player)
-
+    
     SendLeftoverKeyframes(player, framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
-
+    
     bufferData[player] = nil
+    
+    flushPlaybackCacheFromKeyframes(keyframes)
 end
 
 ---@type Receiver
@@ -291,17 +305,17 @@ end
 local function CopyKeyframeExecute(msgLength, player)
     local keyframes = SMH.KeyframeManager.Copy(player, bufferData[player].Ids, bufferData[player].Frames, bufferData[player].Timeline)
     
-    -- for key, keyframe in ipairs(keyframes) do
     local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes(keyframes)
 
     net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
     framecount = SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
     net.Send(player)
-    -- end
 
     SendLeftoverKeyframes(player, framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
 
     bufferData[player] = nil
+
+    flushPlaybackCacheFromKeyframes(keyframes)
 end
 
 ---@type Receiver
@@ -311,7 +325,8 @@ local function DeleteKeyframe(msgLength, player)
     for i = 1, count do 
         local id = net.ReadUInt(INT_BITCOUNT)
         local entity = SMH.KeyframeManager.Delete(player, id, timeline)
-
+        SMH.PlaybackManager.UpdateCacheFor(entity)
+        
         SMH.PropertiesManager.RemoveEntity(player)
 
         net.Start(SMH.MessageTypes.DeleteKeyframeResponse)
@@ -950,6 +965,7 @@ end
 ---@type Receiver
 local function RequestNewSession(msgLength, player)
     SMH.KeyframeData.Players[player] = nil
+    SMH.PlaybackManager.FlushCache()
     return RequestUnpack(msgLength, player)
 end
 
