@@ -32,7 +32,7 @@ local function SendKeyframes(framecount, IDs, ents, Frame, In, Out, ModCount, Mo
         net.WriteUInt(Frame[i], INT_BITCOUNT)
         net.WriteUInt(ModCount[i], INT_BITCOUNT)
         for j = 1, ModCount[i] do
-            net.WriteUInt(SMH.Modifiers.Ids[Modifiers[i][j]], MAX_MODIFIER_BITS)
+            net.WriteUInt(SMH.ModifierInfo.Ids[Modifiers[i][j]], MAX_MODIFIER_BITS)
             net.WriteUInt(doublePrecision(In[i][j]), DECIMAL_BITS)
             net.WriteUInt(doublePrecision(Out[i][j]), DECIMAL_BITS)
         end
@@ -119,7 +119,7 @@ local function SetFrame(msgLength, player)
     local timeline = SMH.PropertiesManager.GetTimelinesInfo(player)
 
     SMH.SettingsManager.StorePlayerSettings(player, settings)
-    SMH.PlaybackManager.SetFrame(player, newFrame, settings)
+    SMH.PlaybackManager.SelectFrame(player, newFrame, settings)
     SMH.GhostsManager.UpdateState(player, newFrame, settings, timeline, timelineset)
 
     net.Start(SMH.MessageTypes.SetFrameResponse)
@@ -197,7 +197,9 @@ end
 local function CreateKeyframe(msgLength, player)
     local entities = {}
     for i = 1, net.ReadUInt(INT_BITCOUNT) do
-        entities[i] = net.ReadEntity()
+        local entity = net.ReadEntity()
+        entities[i] = entity
+        SMH.PlaybackManager.UpdateCacheFor(player, entity)
     end
 
     local frame = net.ReadUInt(INT_BITCOUNT)
@@ -226,11 +228,26 @@ local function CreateKeyframe(msgLength, player)
     SMH.GhostsManager.UpdateKeyframe(player)
 end
 
+---@param player Player
+---@param keyframes FrameData[]
+local function flushPlaybackCacheFromKeyframes(player, keyframes)
+    local flushedEnts = {}
+    for _, keyframe in ipairs(keyframes) do
+        if not flushedEnts[keyframe.Entity] then
+            SMH.PlaybackManager.UpdateCacheFor(player, keyframe.Entity)
+            flushedEnts[keyframe.Entity] = true
+        end
+    end
+end
+
+---@type {[Player]: BufferDatum}
 local bufferData = {}
 
 ---@type Receiver
 local function UpdateKeyframe(msgLength, player)
-    bufferData[player] = {Ids = {}, UpdateData = {}, Timeline = 1}
+    if not bufferData[player] then
+        bufferData[player] = {Ids = {}, UpdateData = {}, Timeline = 1}
+    end
 
     local count = net.ReadUInt(INT_BITCOUNT)
 
@@ -256,20 +273,25 @@ end
 local function UpdateKeyframeExecute(msgLength, player)
     local keyframes = SMH.KeyframeManager.Update(player, bufferData[player].Ids, bufferData[player].UpdateData, bufferData[player].Timeline)
 
-    for key, keyframe in ipairs(keyframes) do
-        local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes({keyframe})
-
-        net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
-        SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
-        net.Send(player)
-    end
-
-    bufferData[player] = {}
+    local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes(keyframes)
+    
+    net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
+    framecount = SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
+    net.Send(player)
+    
+    SendLeftoverKeyframes(player, framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
+    
+    bufferData[player] = nil
+    
+    flushPlaybackCacheFromKeyframes(player, keyframes)
+    SMH.GhostsManager.UpdateKeyframe(player)
 end
 
 ---@type Receiver
 local function CopyKeyframe(msgLength, player)
-    bufferData[player] = {Ids = {}, Frames = {}, Timeline = 1}
+    if not bufferData[player] then
+        bufferData[player] = {Ids = {}, Frames = {}, Timeline = 1}
+    end
 
     local count = net.ReadUInt(INT_BITCOUNT)
 
@@ -285,15 +307,18 @@ end
 local function CopyKeyframeExecute(msgLength, player)
     local keyframes = SMH.KeyframeManager.Copy(player, bufferData[player].Ids, bufferData[player].Frames, bufferData[player].Timeline)
     
-    for key, keyframe in ipairs(keyframes) do
-        local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes({keyframe})
+    local framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers = SMH.TableSplit.DKeyframes(keyframes)
 
-        net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
-        SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
-        net.Send(player)
-    end
+    net.Start(SMH.MessageTypes.UpdateKeyframeResponse)
+    framecount = SendKeyframes(framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
+    net.Send(player)
 
-    bufferData[player] = {}
+    SendLeftoverKeyframes(player, framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
+
+    bufferData[player] = nil
+
+    flushPlaybackCacheFromKeyframes(player, keyframes)
+    SMH.GhostsManager.UpdateKeyframe(player)
 end
 
 ---@type Receiver
@@ -303,7 +328,8 @@ local function DeleteKeyframe(msgLength, player)
     for i = 1, count do 
         local id = net.ReadUInt(INT_BITCOUNT)
         local entity = SMH.KeyframeManager.Delete(player, id, timeline)
-
+        SMH.PlaybackManager.UpdateCacheFor(player, entity)
+        
         SMH.PropertiesManager.RemoveEntity(player)
 
         net.Start(SMH.MessageTypes.DeleteKeyframeResponse)
@@ -322,8 +348,16 @@ local function StartPlayback(msgLength, player)
     SMH.PlaybackManager.StartPlayback(player, startFrame, endFrame, playbackRate, settings)
     SMH.SettingsManager.StorePlayerSettings(player, settings)
 
+    local playerData = SMH.KeyframeData.Players[player]
+    local entities = {}
+
+    for entity, _ in pairs(playerData and playerData.Entities or {}) do
+        table.insert(entities, entity)
+    end
+
     net.Start(SMH.MessageTypes.PlaybackResponse)
     net.WriteBool(true)
+    net.WriteTable(entities, true)
     net.Send(player)
 end
 
@@ -331,8 +365,16 @@ end
 local function StopPlayback(msgLength, player)
     SMH.PlaybackManager.StopPlayback(player)
 
+    local playerData = SMH.KeyframeData.Players[player]
+    local entities = {}
+
+    for entity, _ in pairs(playerData and playerData.Entities or {}) do
+        table.insert(entities, entity)
+    end
+    
     net.Start(SMH.MessageTypes.PlaybackResponse)
     net.WriteBool(false)
+    net.WriteTable(entities, true)
     net.Send(player)
 end
 
@@ -416,6 +458,8 @@ local function Load(msgLength, player)
     net.Send(player)
 
     SendLeftoverKeyframes(player, framecount, IDs, ents, Frame, In, Out, KModCount, KModifiers)
+
+    SMH.PlaybackManager.UpdateCacheFor(player, entity)
 end
 
 ---@type Receiver
@@ -668,7 +712,7 @@ local function RequestModifiers(msgLength, player)
 
     net.Start(SMH.MessageTypes.RequestModifiersResponse)
     net.WriteTable(list)
-    net.WriteTable(SMH.Modifiers.Names, true)
+    net.WriteTable(SMH.ModifierInfo.Names, true)
     net.Send(player)
 end
 
@@ -833,6 +877,7 @@ local function SpawnEntity(msgLength, player)
     SMH.KeyframeManager.ImportSave(player, entity, serializedKeyframes, entityProperties)
     ---@cast pos Vector
     SMH.Spawner.OffsetKeyframes(player, entity, pos)
+    SMH.PlaybackManager.UpdateCacheFor(player, entity)
 end
 
 ---@type Receiver
@@ -942,34 +987,46 @@ end
 ---@type Receiver
 local function RequestNewSession(msgLength, player)
     SMH.KeyframeData.Players[player] = nil
+    SMH.Properties.Players[player] = nil
+    SMH.PlaybackManager.FlushCache(player)
+
+    GetServerEntities(msgLength, player)
+
     return RequestUnpack(msgLength, player)
 end
 
 local MGR = {}
 
+---@param player Player
 function MGR.StopPhysicsRecordResponse(player)
     net.Start(SMH.MessageTypes.StopPhysicsRecordResponse)
     net.Send(player)
 end
 
 -- AUDIO =========================
+---@param id integer
+---@param player Player
 function MGR.PlayAudio(id, player)
 	net.Start(SMH.MessageTypes.PlayAudio)
 	net.WriteUInt(id, INT_BITCOUNT)
 	net.Send(player)
 end
 
+---@param id integer
+---@param player Player
 function MGR.StopAudio(id, player)
 	net.Start(SMH.MessageTypes.StopAudio)
 	net.WriteUInt(id, INT_BITCOUNT)
 	net.Send(player)
 end
 
+---@param player Player
 function MGR.StopAllAudio(player)
 	net.Start(SMH.MessageTypes.StopAllAudio)
 	net.Send(player)
 end
 
+---@type Receiver
 local function UpdateServerAudio(len, ply)
 	SMH.PlaybackManager.UpdateServerAudio(len, ply)
 end

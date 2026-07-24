@@ -14,8 +14,10 @@
 
 -- SMH Types
 
+---@alias EntitySet Set<Entity>
+
 ---@class NewState
----@field Entity {[Entity]: boolean}?
+---@field Entity EntitySet?
 ---@field Frame integer?
 ---@field Timeline integer?
 ---@field PlaybackRate integer?
@@ -23,7 +25,7 @@
 ---@field TimeStamp number?
 
 ---@class State
----@field Entity {[Entity]: boolean}
+---@field Entity EntitySet
 ---@field Frame integer
 ---@field Timeline integer
 ---@field PlaybackRate integer
@@ -59,6 +61,25 @@
 ---@field SmoothPlayback boolean
 ---@field EnableWorld boolean
 
+---### Structure
+---
+---```
+---{
+--- [Entity]: {
+---     [Modifier]: {
+---         [Frame]: {
+---             [1]: PrevFrame
+---             [2]: NextFrame
+---             [3]: LerpMultiplier
+---         }
+---     }
+--- }
+---}
+---```
+---
+---@alias PlaybackCache {[Player]: {[Entity]: {[Modifier]: {[number]: {[1]: FrameData, [2]: FrameData, [3]: number}}}}}
+---@alias ModifierCache {[Player]: {[Entity]: {[Modifiers]: ModifierClass}}}
+
 ---@class Playback
 ---@field StartFrame integer
 ---@field EndFrame integer
@@ -77,6 +98,13 @@
 ---@field Frame integer
 ---@field Physbones boolean
 ---@field RagdollWeightData number[]
+---@field smh_OldDoNotDuplicate boolean
+
+---@class BufferDatum
+---@field Ids integer[]
+---@field UpdateData table?
+---@field Frames table?
+---@field Timeline integer
 
 ---@alias Modifiers
 ---| "advcamera"
@@ -128,6 +156,10 @@
 ---@class ColorPose A struct of the entity's color at an SMH frame
 ---@field Color Color
 
+---@class ModifierClass
+---@field Name string
+---@field Ghost boolean
+
 ---@class Modifier A struct of the entity's modifiers
 ---@field physbones FramePose[]?
 ---@field bones FramePose[]?
@@ -152,6 +184,8 @@
 ---@field EaseOut number|table<string, number> If stored as a number, then this is an legacy SMH save file, otherwise this is an new SMH save file.
 ---@field Modifiers table<Modifiers, Modifier> Legacy SMH save file feature
 ---@field Frame number
+---@field Previous FrameData?
+---@field Next FrameData?
 
 ---@alias TimelineMods TimelineMod[]
 
@@ -195,7 +229,7 @@
 ---@field LastTween boolean
 
 ---@alias GhostSettings {[Player]: Settings}
----@alias SpawnGhost {[Player]: Entity}
+---@alias SpawnGhost {[Player]: SMHEntity}
 ---@alias SpawnGhostData {[Player]: table}
 
 ---@alias GhostData table<Player, GhostDatum>
@@ -213,7 +247,7 @@
 
 ---@class PlayerData
 ---@field Keyframes FrameData[]
----@field Entities {[Entity]: FrameData[]}
+---@field Entities {[SMHEntity]: FrameData[]}
 
 ---@class KeyframeData
 ---@field Players {[Player]: PlayerData}

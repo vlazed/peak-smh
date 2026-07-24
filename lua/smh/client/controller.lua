@@ -263,6 +263,7 @@ function CTRL.Stretch(frames, amount)
         local done = co()
         if done then
             timer.Remove("SMH_Stretching_Timer")
+            RequestNodes()
         end
     end)
 
@@ -358,6 +359,8 @@ function CTRL.UpdateKeyframe(keyframeId, updateData, singledata)
 
     net.Start(SMH.MessageTypes.UpdateKeyframeExecute)
     net.SendToServer()
+
+    RequestNodes()
 end
 
 ---@param keyframeId integer[]
@@ -381,6 +384,8 @@ function CTRL.CopyKeyframe(keyframeId, frame)
 
     net.Start(SMH.MessageTypes.CopyKeyframeExecute)
     net.SendToServer()
+
+    RequestNodes()
 end
 
 ---@param keyframeId integer[]
@@ -400,6 +405,8 @@ function CTRL.DeleteKeyframe(keyframeId)
 
         net.SendToServer()
     end
+
+    RequestNodes()
 end
 
 local function PlayAudioInBetween()
@@ -702,6 +709,14 @@ function CTRL.SetRendering(rendering)
     net.Start(SMH.MessageTypes.SetRendering)
     net.WriteBool(rendering)
     net.SendToServer()
+
+    local entities = {}
+    for _, entity in ents.Iterator() do
+        if entity.GetModel and entity:GetModel() then
+            table.insert(entities, entity)
+        end
+    end
+    SMH.Renderer.ForceRenderEntities(entities, SMH.Renderer.IsRendering())
 end
 
 function CTRL.UpdateGhostState()
@@ -1183,19 +1198,19 @@ end
 
 -- AUDIO CONTROL =================
 local function PlayAudio()
-	//print("play audio")
+	--print("play audio")
 	local id = net.ReadUInt(INT_BITCOUNT)
 	SMH.AudioClip.Play(id)
 end
 
 local function StopAudio()
-	//print("stop audio")
+	--print("stop audio")
 	local id = net.ReadUInt(INT_BITCOUNT)
 	SMH.AudioClip.Stop(id)
 end
 
 local function StopAllAudio()
-	//print("stop all audio")
+	--print("stop all audio")
 	SMH.AudioClip.StopAll()
 end
 -- ===============================
@@ -1208,6 +1223,13 @@ local function ReceiveModifierIds(msgLength)
         modNames[i] = net.ReadString()
     end
 
+end
+
+local function PlaybackResponse(msgLength)
+    local isPlaying = net.ReadBool()
+    local entities = net.ReadTable(true)
+
+    SMH.Renderer.ForceRenderEntities(entities, isPlaying)
 end
 
 local function Setup()
@@ -1252,6 +1274,8 @@ local function Setup()
 
     net.Receive(SMH.MessageTypes.RequestDefaultPose, RequestDefaultPose)
     net.Receive(SMH.MessageTypes.UpdateNode, UpdateNode)
+
+    net.Receive(SMH.MessageTypes.PlaybackResponse, PlaybackResponse)
 
     if game.SinglePlayer() then
         local lastUpdate = SMH.State.TimeStamp

@@ -82,6 +82,10 @@ function MOD:Load(entity, data)
 
 end
 
+local lerpLinear = SMH.LerpLinear
+local lerpLinearAngle = SMH.LerpLinearAngle
+local lerpLinearVector = SMH.LerpLinearVector
+
 function MOD:LoadBetween(entity, data1, data2, percentage)
 
     if self:IsPhysicsProp(entity) then return nil end
@@ -92,13 +96,13 @@ function MOD:LoadBetween(entity, data1, data2, percentage)
         local result = data1[networkVar]
         if result then
             if isvector(result) then
-                result = SMH.LerpLinearVector(data1[networkVar], data2[networkVar], percentage)
+                result = lerpLinearVector(data1[networkVar], data2[networkVar], percentage)
             elseif isangle(result) then
-                result = SMH.LerpLinearAngle(data1[networkVar], data2[networkVar], percentage)
+                result = lerpLinearAngle(data1[networkVar], data2[networkVar], percentage)
             elseif IsColor(result) then
                 result = result:Lerp(data2[networkVar], percentage)
             elseif isnumber(result) then
-                result = SMH.LerpLinear(data1[networkVar], data2[networkVar], percentage)
+                result = lerpLinear(data1[networkVar], data2[networkVar], percentage)
             end
             setNetworkVar(entity, networkVar, result)
         end
