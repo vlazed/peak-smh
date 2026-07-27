@@ -26,7 +26,7 @@ function MOD:InitializeNetworkVars(entity)
     if not networkVarMap[c] then
         networkVarMap[c] = {
             set = {},
-            tab = {}
+            arr = {}
         }
         
         for k, _ in pairs(entity:GetNetworkVars()) do
