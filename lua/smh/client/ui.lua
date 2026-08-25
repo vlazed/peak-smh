@@ -830,7 +830,7 @@ function MGR.UpdateKeyframe(keyframe)
         -- end
     end
     local modId = next(PropertiesMenu:GetCurrentModifiers())
-    while not keyframe.EaseIn[modId] do
+    while not keyframe.EaseIn[modId] and modId do
         modId = next(PropertiesMenu:GetCurrentModifiers(), modId)
     end
 
