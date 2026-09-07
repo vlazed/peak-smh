@@ -21,7 +21,7 @@ extensions = [
 
 lua_ls_project_root = "../"
 lua_ls_backend = "luals"
-lua_ls_verbose = True
+lua_ls_verbose = False # Set to True for debugging
 
 primary_domain = "lua"
 
