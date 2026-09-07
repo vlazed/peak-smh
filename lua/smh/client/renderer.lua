@@ -10,16 +10,19 @@ CreateMaterial("SMH_XRay", "UnlitGeneric", {
     ["$nocull"] = 		1,
 })
 
----This stores the nodes for easy iteration
----@type Node[]
+--- This stores the nodes for easy iteration
+--- @type Node[]
 local Nodes = {}
----This stores the existing nodes indexed by frame, for easy access
----@type SerializedNode[]
+--- This stores the existing nodes indexed by frame, for easy access
+--- @type SerializedNode[]
 local NodeSet = {}
 
+--- [CLIENT]
+--- 
+--- @class SMH.Renderer
 local MGR = {}
 
----@return boolean
+--- @return boolean
 function MGR.IsRendering()
     return IsRendering
 end
@@ -55,8 +58,8 @@ local function RenderTick()
 
 end
 
----@param renderCmd string
----@param StartFrame integer
+--- @param renderCmd string
+--- @param StartFrame integer
 function MGR.Start(renderCmd, StartFrame)
     if not isstring(renderCmd) then error(string.format("Tried to start a render with a non-string renderCmd: %s: %q", type(renderCmd), tostring(renderCmd))) end
     RenderCmd = renderCmd
@@ -71,18 +74,20 @@ function MGR.Start(renderCmd, StartFrame)
     timer.Simple(1, RenderTick)
 end
 
----@param nodeSet SerializedNode[]
+--- @param nodeSet SerializedNode[]
 local function updateNodes(nodeSet)
     for frame, pose in SortedPairs(nodeSet) do
         table.insert(Nodes, {Pos = pose[1], Ang = pose[2], Frame = frame})
     end
 end
 
+--- @param newNodes NetworkedNode[]
 function MGR.SetNodes(newNodes)
     Nodes = {}
     NodeSet = {}
 
     if #newNodes == 0 then return end
+    ---@type SerializedNode[]
     local sortedNodes = {}
     for i = 1, #newNodes do
         sortedNodes[newNodes[i][1]] = {newNodes[i][2], newNodes[i][3]}
@@ -95,8 +100,8 @@ function MGR.GetNodes()
     return Nodes
 end
 
----@param frame integer
----@param frameData SerializedNode
+--- @param frame integer
+--- @param frameData SerializedNode
 function MGR.UpdateNode(frame, frameData)
     if not frameData then return end
     if NodeSet[frame] then
@@ -108,16 +113,16 @@ function MGR.UpdateNode(frame, frameData)
     updateNodes(NodeSet)
 end
 
----@return Vector
----@return Angle
+--- @return Vector
+--- @return Angle
 function MGR.GetBonePoseFromFrame()
     if not next(NodeSet) then 
         return vector_origin, angle_zero
     end
 
-    ---@type Vector, Angle, Vector, Angle
+    --- @type Vector, Angle, Vector, Angle
     local prevPos, prevAng, nextPos, nextAng
-    ---@type integer, integer, integer
+    --- @type integer, integer, integer
     local currentFrame, prevFrame, nextFrame = SMH.State.Frame, 0, SMH.State.PlaybackLength
     for i = currentFrame, 0, -1 do
         if NodeSet[i] then
