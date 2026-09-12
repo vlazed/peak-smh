@@ -98,15 +98,17 @@ local function RequestDefaultPose()
         entity = entity.AttachedEntity
     end
 
+    ---@diagnostic disable
     local csModel = ClientsideModel(entity:GetModel())
     csModel:DrawModel()
 	csModel:SetupBones()
 	csModel:InvalidateBoneCache()
     local tree = GetDefaultPoseTree(csModel)
     csModel:Remove()
+    ---@diagnostic enable
 
     net.Start(SMH.MessageTypes.RequestDefaultPoseResponse)
-    net.WriteString(entity:GetModel())
+    net.WriteString(entity:GetModel()) ---@diagnostic disable-line: param-type-mismatch
     net.WriteUInt(#tree, 8)
     for i = 1, #tree do
         net.WriteVector(tree[i][1])
@@ -171,7 +173,7 @@ end
 function CTRL.AddAudio(path)
 	local frame = SMH.State.Frame
 
-	print(path, frame)
+	-- print(path, frame)
 	
 	local audioclips = SMH.AudioClipManager.Create(path, frame)
 end
@@ -196,7 +198,7 @@ end
 
 --- Notify the server of changes to audio updates. 
 --- 
---- **This must be called after any functions that add or delete audio**
+--- **This must be called after any functions that add, delete, or trim audio**
 function CTRL.UpdateServerAudio()
 	local audioTable = {}
 	for i,clip in pairs(SMH.AudioClipData.AudioClips) do
@@ -448,15 +450,23 @@ function CTRL.DeleteKeyframe(keyframeId)
 end
 
 local function PlayAudioInBetween()
+    local currentFrame = SMH.State.Frame
+    local playbackRate = SMH.State.PlaybackRate
+    local secondsPerFrame = 1 / playbackRate
     -- AUDIO =========================
 	//check for any clips that are partway through and play them from that point
-	for i,clip in pairs(SMH.AudioClipData.AudioClips) do
+	for i,clip in ipairs(SMH.AudioClipData.AudioClips) do
+        local startFrame = clip.Frame
+        local duration = clip.Duration
 		//calculate end frame
-		local endFrame = math.ceil(SMH.State.Frame + SMH.State.PlaybackRate * clip.Duration)
-		if SMH.State.Frame > clip.Frame and SMH.State.Frame < endFrame then
+		local endFrame = math.ceil(currentFrame + playbackRate * duration)
+		if currentFrame > startFrame and currentFrame < endFrame then
 			//calculate start point
-			local startTime = ((SMH.State.Frame-clip.Frame-0.5)/SMH.State.PlaybackRate)+clip.StartTime
+			local startTime = ((currentFrame - startFrame - 0.5) * secondsPerFrame) + clip.StartTime
 			SMH.AudioClip.Play(clip.ID, startTime)
+            timer.Simple(duration - startTime, function()
+                SMH.AudioClip.Stop(clip.ID)
+            end)
 		end
 	end
 	-- AUDIO =========================
@@ -1178,7 +1188,7 @@ local function AddFolderResponse(msgLength)
         return
     end
 
-    SMH.UI.AddFolder(folder, LocalPlayer())
+    SMH.Saves.AddFolder(folder, LocalPlayer())
 end
 
 local function RequestAppendResponse(msgLength)
@@ -1261,6 +1271,7 @@ local function StopPhysicsRecordResponse(msgLength)
 end
 
 local function RequestNodesResponse(msgLength)
+    ---@type NetworkedNode[]
     local nodes = {}
     local len = net.ReadUInt(14)
     for i = 1, len do 
